@@ -2,12 +2,23 @@ const Calculator = {
   // 1回分のテスト統計を算出（満点が異なる場合も100点換算平均を算出）
   calcTestStats(test) {
     if (!test || !test.subjects || test.subjects.length === 0) {
-      return { totalScore: 0, totalMax: 0, avgNormalized: 0, totalHours: 0 };
+      return {
+        totalScore: 0,
+        totalMax: 0,
+        avgNormalized: 0,
+        totalHours: 0,
+        testAvgNormalized: null,
+        testAvgTotal: null,
+        diffFromTestAvg: null
+      };
     }
     let totalScore = 0;
     let totalMax = 0;
     let normSum = 0;
     let totalHours = 0;
+
+    let subjAvgNormSum = 0;
+    let subjAvgCount = 0;
 
     test.subjects.forEach((s) => {
       const sc = Number(s.score) || 0;
@@ -16,14 +27,38 @@ const Calculator = {
       totalMax += mx;
       normSum += mx > 0 ? (sc / mx) * 100 : 0;
       totalHours += Number(s.studyHours) || 0;
+
+      if (s.classAvg !== null && s.classAvg !== undefined && s.classAvg !== "" && !Number.isNaN(Number(s.classAvg))) {
+        const cAvg = Number(s.classAvg);
+        subjAvgNormSum += mx > 0 ? (cAvg / mx) * 100 : 0;
+        subjAvgCount++;
+      }
     });
 
-    const avgNormalized = normSum / test.subjects.length;
+    const avgNormalized = Number((normSum / test.subjects.length).toFixed(1));
+
+    // テスト平均点の決定：明示入力(test.testAvg)優先、未入力なら教科別平均点から自動算出
+    let testAvgNormalized = null;
+    if (test.testAvg !== null && test.testAvg !== undefined && test.testAvg !== "" && !Number.isNaN(Number(test.testAvg))) {
+      testAvgNormalized = Number(Number(test.testAvg).toFixed(1));
+    } else if (subjAvgCount > 0) {
+      testAvgNormalized = Number((subjAvgNormSum / subjAvgCount).toFixed(1));
+    }
+
+    const diffFromTestAvg =
+      testAvgNormalized !== null ? Number((avgNormalized - testAvgNormalized).toFixed(1)) : null;
+
+    const testAvgTotal =
+      testAvgNormalized !== null ? Math.round((testAvgNormalized / 100) * totalMax) : null;
+
     return {
       totalScore,
       totalMax,
-      avgNormalized: Number(avgNormalized.toFixed(1)),
-      totalHours: Number(totalHours.toFixed(1))
+      avgNormalized,
+      totalHours: Number(totalHours.toFixed(1)),
+      testAvgNormalized,
+      testAvgTotal,
+      diffFromTestAvg
     };
   },
 
@@ -44,6 +79,8 @@ const Calculator = {
         expPercent: 0,
         latestAvg: 0,
         diffPrev: null,
+        diffTestAvg: null,
+        latestTestAvg: null,
         rank: "-",
         pbCount: 0,
         goalGap: 0,
@@ -112,6 +149,8 @@ const Calculator = {
       expPercent,
       latestAvg: latestStats.avgNormalized,
       diffPrev,
+      diffTestAvg: latestStats.diffFromTestAvg,
+      latestTestAvg: latestStats.testAvgNormalized,
       rank: this.getRank(latestStats.avgNormalized),
       pbCount,
       goalGap,

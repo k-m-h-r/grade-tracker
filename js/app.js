@@ -85,17 +85,22 @@ function bindEvents() {
     ChartManager.renderTrendChart(records, e.target.value);
   });
 
+  // テスト平均点直接入力時のリアルタイム更新
+  document.getElementById("test-avg").addEventListener("input", updateLiveSummary);
+
   // プリセットボタン
   document.querySelectorAll("[data-preset]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const list = PRESETS[btn.dataset.preset] || [];
-      renderSubjectInputRows(list.map((name) => ({ name, score: "", maxScore: 100, studyHours: 0, mistakes: [] })));
+      renderSubjectInputRows(
+        list.map((name) => ({ name, score: "", classAvg: "", maxScore: 100, studyHours: 0, mistakes: [] }))
+      );
     });
   });
 
   // 科目追加ボタン
   document.getElementById("btn-add-subject").addEventListener("click", () => {
-    appendSubjectRow({ name: "", score: "", maxScore: 100, studyHours: 0, mistakes: [] });
+    appendSubjectRow({ name: "", score: "", classAvg: "", maxScore: 100, studyHours: 0, mistakes: [] });
   });
 
   // 成績保存ボタン
@@ -123,7 +128,7 @@ function bindEvents() {
 function initInputForm() {
   document.getElementById("test-date").value = new Date().toISOString().slice(0, 10);
   renderSubjectInputRows(
-    PRESETS.science.map((name) => ({ name, score: "", maxScore: 100, studyHours: 0, mistakes: [] }))
+    PRESETS.science.map((name) => ({ name, score: "", classAvg: "", maxScore: 100, studyHours: 0, mistakes: [] }))
   );
 }
 
@@ -144,7 +149,8 @@ function appendSubjectRow(subj) {
 
   tr.innerHTML = `
     <td><input type="text" class="inp-name" value="${escapeHtml(subj.name)}" placeholder="教科名" /></td>
-    <td><input type="number" class="inp-score" value="${escapeHtml(subj.score)}" min="0" max="1000" placeholder="点数" /></td>
+    <td><input type="number" class="inp-score" value="${escapeHtml(subj.score)}" min="0" max="1000" placeholder="得点" /></td>
+    <td><input type="number" class="inp-class-avg" value="${escapeHtml(subj.classAvg ?? "")}" min="0" max="1000" step="0.1" placeholder="任意" /></td>
     <td><input type="number" class="inp-max" value="${escapeHtml(subj.maxScore || 100)}" min="1" max="1000" /></td>
     <td><input type="number" class="inp-hours" value="${escapeHtml(subj.studyHours || 0)}" min="0" max="500" step="0.5" /></td>
     <td><div class="mistake-chips">${chipsHtml}</div></td>
@@ -183,31 +189,60 @@ function appendSubjectRow(subj) {
   tbody.appendChild(tr);
 }
 
-function collectInputSubjects() {
+function collectInputSubjects(includeEmptyScore = false) {
   const rows = Array.from(document.querySelectorAll("#score-input-tbody tr"));
   return rows
     .map((tr) => {
       const name = tr.querySelector(".inp-name").value.trim();
       const scoreRaw = tr.querySelector(".inp-score").value;
+      const classAvgRaw = tr.querySelector(".inp-class-avg").value;
       const maxScore = Number(tr.querySelector(".inp-max").value) || 100;
       const studyHours = Number(tr.querySelector(".inp-hours").value) || 0;
       const mistakes = Array.from(tr.querySelectorAll(".m-chip.selected")).map((c) => c.dataset.tag);
       return {
         name,
         score: scoreRaw === "" ? null : Number(scoreRaw),
+        classAvg: classAvgRaw === "" ? null : Number(classAvgRaw),
         maxScore,
         studyHours,
         mistakes
       };
     })
-    .filter((s) => s.name !== "" && s.score !== null);
+    .filter((s) => s.name !== "" && (includeEmptyScore || s.score !== null));
 }
 
 function updateLiveSummary() {
-  const subjects = collectInputSubjects();
-  const st = Calculator.calcTestStats({ subjects });
+  const subjects = collectInputSubjects(false);
+  const allRows = collectInputSubjects(true);
+  const manualTestAvgRaw = document.getElementById("test-avg").value;
+  const manualTestAvg = manualTestAvgRaw === "" ? null : Number(manualTestAvgRaw);
+
+  // 教科別平均点からの自動算出プレビューをplaceholderに反映
+  const autoStats = Calculator.calcTestStats({ subjects: allRows, testAvg: null });
+  const testAvgInput = document.getElementById("test-avg");
+  testAvgInput.placeholder =
+    autoStats.testAvgNormalized !== null ? `自動算出: ${autoStats.testAvgNormalized}` : "教科平均から自動計算";
+
+  const st = Calculator.calcTestStats({ subjects, testAvg: manualTestAvg });
   document.getElementById("live-total").textContent = st.totalScore;
   document.getElementById("live-avg").textContent = st.avgNormalized.toFixed(1);
+
+  const liveTestAvgEl = document.getElementById("live-test-avg");
+  const liveDiffEl = document.getElementById("live-avg-diff");
+  if (st.testAvgNormalized !== null) {
+    liveTestAvgEl.textContent = `${st.testAvgNormalized.toFixed(1)} 点`;
+    if (subjects.length > 0 && st.diffFromTestAvg !== null) {
+      const sign = st.diffFromTestAvg >= 0 ? "+" : "";
+      liveDiffEl.textContent = `(${sign}${st.diffFromTestAvg})`;
+      liveDiffEl.style.color = st.diffFromTestAvg >= 0 ? "var(--accent)" : "var(--danger)";
+    } else {
+      liveDiffEl.textContent = "";
+    }
+  } else {
+    liveTestAvgEl.textContent = "--";
+    liveDiffEl.textContent = "";
+  }
+
   document.getElementById("live-rank").textContent = subjects.length ? Calculator.getRank(st.avgNormalized) : "-";
 }
 
@@ -216,8 +251,10 @@ function handleSaveTest() {
   const date = document.getElementById("test-date").value || new Date().toISOString().slice(0, 10);
   const type = document.getElementById("test-type").value;
   const goalAvg = Number(document.getElementById("test-goal").value) || 80;
+  const testAvgRaw = document.getElementById("test-avg").value;
+  const testAvg = testAvgRaw === "" ? null : Number(testAvgRaw);
   const memo = document.getElementById("test-memo").value.trim();
-  const subjects = collectInputSubjects();
+  const subjects = collectInputSubjects(false);
 
   if (!subjects.length) {
     alert("少なくとも1教科の点数と教科名を入力してください。");
@@ -230,12 +267,14 @@ function handleSaveTest() {
     date,
     type,
     goalAvg,
+    testAvg,
     memo,
     subjects
   };
 
   records = StorageManager.addRecord(newRecord);
   document.getElementById("test-name").value = "";
+  document.getElementById("test-avg").value = "";
   document.getElementById("test-memo").value = "";
   refreshAll();
 
@@ -271,6 +310,14 @@ function renderDashboard() {
   } else {
     const sign = rpg.diffPrev >= 0 ? "+" : "";
     document.getElementById("kpi-diff-prev").textContent = `前回比 ${sign}${rpg.diffPrev}点`;
+  }
+
+  const diffTestAvgEl = document.getElementById("kpi-diff-testavg");
+  if (rpg.latestTestAvg === null || rpg.diffTestAvg === null) {
+    diffTestAvgEl.textContent = "テスト平均比 --";
+  } else {
+    const sign = rpg.diffTestAvg >= 0 ? "+" : "";
+    diffTestAvgEl.textContent = `テスト平均(${rpg.latestTestAvg})比 ${sign}${rpg.diffTestAvg}点`;
   }
 
   document.getElementById("kpi-rank").textContent = rpg.rank;
@@ -311,7 +358,19 @@ function renderDashboard() {
   [...records].reverse().forEach((rec) => {
     const st = Calculator.calcTestStats(rec);
     const rank = Calculator.getRank(st.avgNormalized);
-    const subjSummary = rec.subjects.map((s) => `${escapeHtml(s.name)}:${s.score}`).join(" / ");
+    const subjSummary = rec.subjects
+      .map((s) => {
+        const cAvgStr =
+          s.classAvg !== null && s.classAvg !== undefined && s.classAvg !== "" ? `(平${s.classAvg})` : "";
+        return `${escapeHtml(s.name)}:${s.score}${cAvgStr}`;
+      })
+      .join(" / ");
+
+    let testAvgBadgeHtml = "";
+    if (st.testAvgNormalized !== null) {
+      const sign = st.diffFromTestAvg >= 0 ? "+" : "";
+      testAvgBadgeHtml = `<span class="avg-pill">テスト平均 ${st.testAvgNormalized}点 (<span class="sensitive">${sign}${st.diffFromTestAvg}</span>)</span>`;
+    }
 
     const item = document.createElement("div");
     item.className = "history-item";
@@ -322,8 +381,9 @@ function renderDashboard() {
           <span class="history-title">${escapeHtml(rec.name)}</span>
           <span class="history-date">${escapeHtml(rec.date)}</span>
           <strong>[Rank ${rank}]</strong>
+          ${testAvgBadgeHtml}
         </div>
-        <div class="history-scores sensitive">平均 ${st.avgNormalized}点（${subjSummary}）</div>
+        <div class="history-scores sensitive">自分平均 ${st.avgNormalized}点（${subjSummary}）</div>
         ${rec.memo ? `<div class="hint-text" style="margin-top:4px;">📝 ${escapeHtml(rec.memo)}</div>` : ""}
       </div>
       <div class="history-actions">
@@ -374,11 +434,15 @@ function renderSimulator() {
 
     const diff = t - norm;
     const diffStr = diff > 0 ? `+${diff}点` : `${diff}点`;
+    const refAvgStr =
+      s.classAvg !== null && s.classAvg !== undefined && s.classAvg !== ""
+        ? ` <span class="hint-text">(平均 ${s.classAvg}点)</span>`
+        : "";
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><strong>${escapeHtml(s.name)}</strong></td>
-      <td class="sensitive">${norm}点</td>
+      <td><span class="sensitive">${norm}点</span>${refAvgStr}</td>
       <td><input type="number" class="sim-w" value="${w}" min="0.5" max="5" step="0.5" style="width:75px;" /></td>
       <td><input type="number" class="sim-t" value="${t}" min="0" max="100" style="width:85px;" /></td>
       <td class="sensitive" style="color:${diff > 0 ? "var(--warning)" : "var(--accent)"}; font-weight:700;">${diffStr}</td>

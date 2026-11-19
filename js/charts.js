@@ -15,12 +15,13 @@ const ChartManager = {
       grid: isDark ? "rgba(148, 163, 184, 0.15)" : "rgba(100, 116, 139, 0.15)",
       primary: isDark ? "#60a5fa" : "#3b82f6",
       accent: isDark ? "#34d399" : "#10b981",
+      info: isDark ? "#22d3ee" : "#0891b2",
       warning: isDark ? "#fbbf24" : "#f59e0b",
       danger: isDark ? "#f87171" : "#ef4444"
     };
   },
 
-  // 1. 成績推移＆目標ライン折れ線グラフ
+  // 1. 成績推移＆テスト平均・目標ライン折れ線グラフ
   renderTrendChart(records, metric = "avg") {
     this.destroyIfExists("trend");
     const ctx = document.getElementById("chart-trend");
@@ -32,37 +33,55 @@ const ChartManager = {
       const st = Calculator.calcTestStats(r);
       return metric === "avg" ? st.avgNormalized : st.totalScore;
     });
+    const testAvgs = records.map((r) => {
+      const st = Calculator.calcTestStats(r);
+      return metric === "avg" ? st.testAvgNormalized : st.testAvgTotal;
+    });
     const goals = records.map((r) => {
       if (metric === "avg") return Number(r.goalAvg) || 80;
       const st = Calculator.calcTestStats(r);
       return Math.round(((Number(r.goalAvg) || 80) / 100) * st.totalMax);
     });
 
+    const datasets = [
+      {
+        label: metric === "avg" ? "自分の平均点" : "自分の合計点",
+        data: values,
+        borderColor: c.primary,
+        backgroundColor: c.primary,
+        borderWidth: 3,
+        tension: 0.25,
+        pointRadius: 5
+      }
+    ];
+
+    if (testAvgs.some((v) => v !== null)) {
+      datasets.push({
+        label: metric === "avg" ? "テスト平均点" : "テスト平均(換算合計)",
+        data: testAvgs,
+        borderColor: c.info,
+        backgroundColor: c.info,
+        borderDash: [4, 4],
+        borderWidth: 2,
+        tension: 0.25,
+        pointRadius: 4,
+        spanGaps: true
+      });
+    }
+
+    datasets.push({
+      label: "目標ライン",
+      data: goals,
+      borderColor: c.warning,
+      borderDash: [6, 6],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false
+    });
+
     this.instances.trend = new Chart(ctx, {
       type: "line",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: metric === "avg" ? "平均点 (100点換算)" : "合計点",
-            data: values,
-            borderColor: c.primary,
-            backgroundColor: c.primary,
-            borderWidth: 3,
-            tension: 0.25,
-            pointRadius: 5
-          },
-          {
-            label: "目標ライン",
-            data: goals,
-            borderColor: c.warning,
-            borderDash: [6, 6],
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: false
-          }
-        ]
-      },
+      data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -77,7 +96,7 @@ const ChartManager = {
     });
   },
 
-  // 2. 教科バランスレーダーチャート
+  // 2. 教科バランスレーダーチャート（自分 vs テスト平均・前回）
   renderRadarChart(records) {
     this.destroyIfExists("radar");
     const ctx = document.getElementById("chart-radar");
@@ -102,6 +121,23 @@ const ChartManager = {
       }
     ];
 
+    const latestClassAvgData = latest.subjects.map((s) => {
+      if (s.classAvg === null || s.classAvg === undefined || s.classAvg === "") return null;
+      return s.maxScore > 0 ? Math.round((Number(s.classAvg) / s.maxScore) * 100) : 0;
+    });
+
+    if (latestClassAvgData.some((v) => v !== null)) {
+      datasets.push({
+        label: "テスト平均",
+        data: latestClassAvgData,
+        borderColor: c.info,
+        backgroundColor: "rgba(34, 211, 238, 0.14)",
+        borderWidth: 2,
+        borderDash: [4, 4],
+        spanGaps: true
+      });
+    }
+
     if (prev) {
       const prevData = labels.map((name) => {
         const found = prev.subjects.find((s) => s.name === name);
@@ -111,9 +147,9 @@ const ChartManager = {
         label: `前回 (${prev.name})`,
         data: prevData,
         borderColor: c.primary,
-        backgroundColor: "rgba(96, 165, 250, 0.12)",
+        backgroundColor: "rgba(96, 165, 250, 0.10)",
         borderWidth: 1.5,
-        borderDash: [4, 4]
+        borderDash: [2, 3]
       });
     }
 
@@ -280,12 +316,21 @@ const ChartManager = {
     ctx.font = "bold 96px sans-serif";
     ctx.fillText(rank, 642, 162);
 
-    // 平均・合計
+    // 平均・合計・テスト平均
     const avgText = isPrivacy ? "**.*" : `${st.avgNormalized}`;
     const totText = isPrivacy ? "*** / ***" : `${st.totalScore} / ${st.totalMax}`;
+    let summaryLine = `AVG: ${avgText} pt   TOTAL: ${totText}`;
+    if (st.testAvgNormalized !== null) {
+      const diffSign = st.diffFromTestAvg >= 0 ? "+" : "";
+      const diffText = isPrivacy ? "**.*" : `${diffSign}${st.diffFromTestAvg}`;
+      summaryLine += `   TEST AVG: ${st.testAvgNormalized} (${diffText})`;
+    } else {
+      summaryLine += `   STUDY: ${st.totalHours}h`;
+    }
+
     ctx.fillStyle = "#38bdf8";
-    ctx.font = "bold 22px sans-serif";
-    ctx.fillText(`AVG: ${avgText} pt    TOTAL: ${totText}    STUDY: ${st.totalHours}h`, 42, 155);
+    ctx.font = "bold 20px sans-serif";
+    ctx.fillText(summaryLine, 42, 155);
 
     // 各教科スコアボックス
     const cols = Math.min(test.subjects.length, 5);
@@ -303,18 +348,24 @@ const ChartManager = {
       ctx.strokeRect(x, y, boxW, 90);
 
       ctx.fillStyle = "#cbd5e1";
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillText(s.name, x + 12, y + 28);
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillText(s.name, x + 12, y + 26);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 26px sans-serif";
+      ctx.font = "bold 25px sans-serif";
       const scStr = isPrivacy ? "**" : `${s.score}`;
-      ctx.fillText(scStr, x + 12, y + 68);
+      ctx.fillText(scStr, x + 12, y + 60);
       const scWidth = ctx.measureText(scStr).width;
 
       ctx.fillStyle = "#64748b";
-      ctx.font = "13px sans-serif";
-      ctx.fillText(`/${s.maxScore}`, x + 16 + scWidth, y + 68);
+      ctx.font = "12px sans-serif";
+      ctx.fillText(`/${s.maxScore}`, x + 15 + scWidth, y + 60);
+
+      if (s.classAvg !== null && s.classAvg !== undefined && s.classAvg !== "") {
+        ctx.fillStyle = "#22d3ee";
+        ctx.font = "11px sans-serif";
+        ctx.fillText(`平均 ${s.classAvg}`, x + 12, y + 80);
+      }
     });
   }
 };

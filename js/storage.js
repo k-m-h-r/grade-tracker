@@ -7,13 +7,14 @@ const DEFAULT_SAMPLE_DATA = [
     date: "2026-05-20",
     type: "定期考査",
     goalAvg: 80,
+    testAvg: 65.4,
     memo: "数学の計算ミスが痛かった。次回は検算時間を5分確保する。",
     subjects: [
-      { name: "英語", score: 78, maxScore: 100, studyHours: 12, mistakes: ["時間不足"] },
-      { name: "数学", score: 72, maxScore: 100, studyHours: 15, mistakes: ["計算ミス"] },
-      { name: "国語", score: 75, maxScore: 100, studyHours: 6, mistakes: ["読解ミス"] },
-      { name: "物理", score: 81, maxScore: 100, studyHours: 10, mistakes: ["応用力"] },
-      { name: "化学", score: 74, maxScore: 100, studyHours: 9, mistakes: ["暗記抜け"] }
+      { name: "英語", score: 78, classAvg: 66.0, maxScore: 100, studyHours: 12, mistakes: ["時間不足"] },
+      { name: "数学", score: 72, classAvg: 61.5, maxScore: 100, studyHours: 15, mistakes: ["計算ミス"] },
+      { name: "国語", score: 75, classAvg: 68.0, maxScore: 100, studyHours: 6, mistakes: ["読解ミス"] },
+      { name: "物理", score: 81, classAvg: 67.5, maxScore: 100, studyHours: 10, mistakes: ["応用力"] },
+      { name: "化学", score: 74, classAvg: 64.0, maxScore: 100, studyHours: 9, mistakes: ["暗記抜け"] }
     ]
   },
   {
@@ -22,13 +23,14 @@ const DEFAULT_SAMPLE_DATA = [
     date: "2026-07-08",
     type: "定期考査",
     goalAvg: 82,
+    testAvg: 67.8,
     memo: "物理と数学が大きく伸びた！英語の長文スピードも改善。",
     subjects: [
-      { name: "英語", score: 83, maxScore: 100, studyHours: 14, mistakes: ["暗記抜け"] },
-      { name: "数学", score: 86, maxScore: 100, studyHours: 18, mistakes: [] },
-      { name: "国語", score: 77, maxScore: 100, studyHours: 7, mistakes: ["読解ミス"] },
-      { name: "物理", score: 89, maxScore: 100, studyHours: 13, mistakes: ["計算ミス"] },
-      { name: "化学", score: 80, maxScore: 100, studyHours: 11, mistakes: ["暗記抜け"] }
+      { name: "英語", score: 83, classAvg: 68.5, maxScore: 100, studyHours: 14, mistakes: ["暗記抜け"] },
+      { name: "数学", score: 86, classAvg: 64.0, maxScore: 100, studyHours: 18, mistakes: [] },
+      { name: "国語", score: 77, classAvg: 70.0, maxScore: 100, studyHours: 7, mistakes: ["読解ミス"] },
+      { name: "物理", score: 89, classAvg: 71.0, maxScore: 100, studyHours: 13, mistakes: ["計算ミス"] },
+      { name: "化学", score: 80, classAvg: 65.5, maxScore: 100, studyHours: 11, mistakes: ["暗記抜け"] }
     ]
   }
 ];
