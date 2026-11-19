@@ -115,8 +115,7 @@ function bindEvents() {
       alert("消去するテストデータがありません。");
       return;
     }
-    if (confirm("記録されているすべてのテストデータを消去しますか？
-（※必要な場合は先に「💾 保存」でバックアップしてください）")) {
+    if (confirm("記録されているすべてのテストデータを消去しますか？\n（※必要な場合は先に「💾 保存」でバックアップしてください）")) {
       records = StorageManager.clearAllRecords();
       lastDeletedRecord = null;
       cancelEditMode(true);
