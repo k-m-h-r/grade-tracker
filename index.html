@@ -119,7 +119,10 @@
       <div class="card">
         <div class="card-header">
           <h2>🗂️ 記録済みテスト一覧</h2>
-          <button id="btn-clear-sample" class="text-btn">サンプル初期化</button>
+          <div class="header-btn-group">
+            <button id="btn-clear-sample" class="text-btn">サンプル初期化</button>
+            <button id="btn-clear-all" class="text-btn danger-text">全データ消去</button>
+          </div>
         </div>
         <div id="history-list" class="history-list"></div>
       </div>
@@ -129,8 +132,16 @@
     <section id="tab-input" class="tab-panel">
       <div class="card">
         <div class="card-header">
-          <h2>⚡ テスト成績の記録</h2>
+          <h2 id="input-form-title">⚡ テスト成績の記録</h2>
           <span class="hint-text">Enterキーで次の点数欄へ自動移動</span>
+        </div>
+
+        <!-- 編集モード通知バナー -->
+        <div id="edit-mode-banner" class="edit-banner hidden">
+          <div>
+            ✏️ 編集中：<strong id="editing-test-title"></strong> の内容を変更しています
+          </div>
+          <button type="button" id="btn-cancel-edit" class="icon-btn">✕ 編集をキャンセル</button>
         </div>
 
         <!-- テスト基本メタ情報 -->
@@ -203,6 +214,7 @@
         </div>
 
         <div class="submit-area">
+          <button type="button" id="btn-cancel-edit-bottom" class="icon-btn hidden">キャンセル</button>
           <button type="button" id="btn-save-test" class="primary-btn">✅ この成績を保存する</button>
         </div>
       </div>
@@ -268,6 +280,12 @@
       </div>
     </section>
   </main>
+
+  <!-- 削除取消・通知トースト -->
+  <div id="toast-bar" class="toast-bar hidden" role="status" aria-live="polite">
+    <span id="toast-message"></span>
+    <button type="button" id="btn-toast-undo" class="icon-btn hidden">↩️ 元に戻す</button>
+  </div>
 
   <!-- リザルトカード生成モーダル -->
   <div id="modal-result" class="modal hidden">
