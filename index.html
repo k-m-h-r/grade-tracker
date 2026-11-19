@@ -93,10 +93,24 @@
         </div>
       </div>
 
+      <!-- 教科ごとの成績推移グラフ -->
+      <div class="card chart-card" id="subject-trend-card">
+        <div class="card-header">
+          <h2>📚 教科ごとの成績推移 ＆ 学習時間</h2>
+          <select id="subject-chart-select" class="mini-select" aria-label="表示する教科を選択"></select>
+        </div>
+        <div id="subject-chart-chips" class="preset-bar" style="margin-bottom: 10px;"></div>
+        <div id="subject-chart-stats" class="subject-stats-bar"></div>
+        <div class="chart-box">
+          <canvas id="chart-subject-trend"></canvas>
+        </div>
+      </div>
+
       <!-- 教科別RPGレベル -->
       <div class="card">
         <div class="card-header">
           <h2>⚔️ 教科別マスタリーレベル</h2>
+          <span class="hint-text">教科をタップで上のグラフに表示</span>
         </div>
         <div id="subject-levels-grid" class="subject-levels-grid"></div>
       </div>
