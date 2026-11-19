@@ -1,6 +1,19 @@
 const ChartManager = {
   instances: {},
 
+  SUBJECT_PALETTE: [
+    "#60a5fa",
+    "#34d399",
+    "#fbbf24",
+    "#a78bfa",
+    "#f87171",
+    "#22d3ee",
+    "#fb923c",
+    "#818cf8",
+    "#2dd4bf",
+    "#f472b6"
+  ],
+
   destroyIfExists(key) {
     if (this.instances[key]) {
       this.instances[key].destroy();
@@ -170,6 +183,185 @@ const ChartManager = {
             grid: { color: c.grid },
             angleLines: { color: c.grid },
             pointLabels: { color: c.text, font: { size: 12, weight: "bold" } }
+          }
+        }
+      }
+    });
+  },
+
+  // 2.5 教科ごとの成績推移＆比較グラフ（単一教科詳細 or 全教科一括比較）
+  renderSubjectTrendChart(records, selectedSubject = "ALL") {
+    this.destroyIfExists("subjectTrend");
+    const ctx = document.getElementById("chart-subject-trend");
+    if (!ctx) return;
+    const c = this.getThemeColors();
+
+    const labels = records.map((r) => r.name);
+
+    // 全教科オーバーレイ比較モード
+    if (selectedSubject === "ALL") {
+      const subjectNames = [];
+      records.forEach((r) => {
+        r.subjects.forEach((s) => {
+          if (!subjectNames.includes(s.name)) subjectNames.push(s.name);
+        });
+      });
+
+      const datasets = subjectNames.map((subjName, idx) => {
+        const color = this.SUBJECT_PALETTE[idx % this.SUBJECT_PALETTE.length];
+        const data = records.map((r) => {
+          const found = r.subjects.find((s) => s.name === subjName);
+          if (!found || !found.maxScore) return null;
+          return Number(((found.score / found.maxScore) * 100).toFixed(1));
+        });
+        return {
+          label: subjName,
+          data,
+          borderColor: color,
+          backgroundColor: color,
+          borderWidth: 2.5,
+          tension: 0.25,
+          pointRadius: 4,
+          spanGaps: true
+        };
+      });
+
+      this.instances.subjectTrend = new Chart(ctx, {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: c.text } },
+            tooltip: {
+              callbacks: {
+                label: (context) => {
+                  const val = context.parsed.y;
+                  return val !== null ? `${context.dataset.label}: ${val}点` : "";
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: c.text }, grid: { color: c.grid } },
+            y: {
+              ticks: { color: c.text },
+              grid: { color: c.grid },
+              min: 0,
+              max: 100,
+              title: { display: true, text: "得点率 / 100点換算", color: c.text }
+            }
+          }
+        }
+      });
+      return;
+    }
+
+    // 単一教科詳細モード（自分の得点 + 教科平均 + 目標ライン + 学習時間バー）
+    const subjScores = records.map((r) => {
+      const found = r.subjects.find((s) => s.name === selectedSubject);
+      if (!found || !found.maxScore) return null;
+      return Number(((found.score / found.maxScore) * 100).toFixed(1));
+    });
+
+    const subjClassAvgs = records.map((r) => {
+      const found = r.subjects.find((s) => s.name === selectedSubject);
+      if (!found || !found.maxScore) return null;
+      if (found.classAvg === null || found.classAvg === undefined || found.classAvg === "") return null;
+      return Number(((Number(found.classAvg) / found.maxScore) * 100).toFixed(1));
+    });
+
+    const subjHours = records.map((r) => {
+      const found = r.subjects.find((s) => s.name === selectedSubject);
+      return found ? Number(found.studyHours) || 0 : 0;
+    });
+
+    const goals = records.map((r) => Number(r.goalAvg) || 80);
+
+    const datasets = [
+      {
+        type: "line",
+        label: `${selectedSubject} 得点（100点換算）`,
+        data: subjScores,
+        borderColor: c.primary,
+        backgroundColor: c.primary,
+        borderWidth: 3,
+        tension: 0.25,
+        pointRadius: 5,
+        spanGaps: true,
+        yAxisID: "y"
+      }
+    ];
+
+    if (subjClassAvgs.some((v) => v !== null)) {
+      datasets.push({
+        type: "line",
+        label: `${selectedSubject} テスト平均`,
+        data: subjClassAvgs,
+        borderColor: c.info,
+        backgroundColor: c.info,
+        borderDash: [4, 4],
+        borderWidth: 2,
+        tension: 0.25,
+        pointRadius: 4,
+        spanGaps: true,
+        yAxisID: "y"
+      });
+    }
+
+    datasets.push({
+      type: "line",
+      label: "目標ライン",
+      data: goals,
+      borderColor: c.warning,
+      borderDash: [6, 6],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+      yAxisID: "y"
+    });
+
+    const maxHours = Math.max(...subjHours, 1);
+    if (subjHours.some((h) => h > 0)) {
+      datasets.push({
+        type: "bar",
+        label: "学習時間 (h)",
+        data: subjHours,
+        backgroundColor: "rgba(52, 211, 153, 0.22)",
+        borderColor: c.accent,
+        borderWidth: 1,
+        borderRadius: 6,
+        barPercentage: 0.45,
+        yAxisID: "yHours"
+      });
+    }
+
+    this.instances.subjectTrend = new Chart(ctx, {
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: c.text } }
+        },
+        scales: {
+          x: { ticks: { color: c.text }, grid: { color: c.grid } },
+          y: {
+            position: "left",
+            min: 0,
+            max: 100,
+            ticks: { color: c.text },
+            grid: { color: c.grid },
+            title: { display: true, text: "得点 (100点換算)", color: c.text }
+          },
+          yHours: {
+            position: "right",
+            beginAtZero: true,
+            suggestedMax: Math.ceil(maxHours * 2.2),
+            ticks: { color: c.accent },
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: "学習時間 (h)", color: c.accent }
           }
         }
       }

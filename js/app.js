@@ -9,6 +9,7 @@ const PRESETS = {
 let records = [];
 let simWeights = {};
 let simTargets = {};
+let selectedChartSubject = "ALL";
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -85,6 +86,11 @@ function bindEvents() {
     ChartManager.renderTrendChart(records, e.target.value);
   });
 
+  // 教科別グラフドロップダウン切替
+  document.getElementById("subject-chart-select").addEventListener("change", (e) => {
+    setSelectedChartSubject(e.target.value);
+  });
+
   // テスト平均点直接入力時のリアルタイム更新
   document.getElementById("test-avg").addEventListener("input", updateLiveSummary);
 
@@ -123,6 +129,148 @@ function bindEvents() {
     link.click();
     link.remove();
   });
+}
+
+function getAllSubjectNames() {
+  const names = [];
+  records.forEach((r) => {
+    r.subjects.forEach((s) => {
+      if (s.name && !names.includes(s.name)) names.push(s.name);
+    });
+  });
+  return names;
+}
+
+function setSelectedChartSubject(subj) {
+  selectedChartSubject = subj;
+  renderSubjectChartControls();
+  ChartManager.renderSubjectTrendChart(records, selectedChartSubject);
+  // マスタリーカードの選択状態も同期
+  document.querySelectorAll(".subj-lv-item").forEach((el) => {
+    el.classList.toggle("selected", el.dataset.subject === selectedChartSubject);
+  });
+}
+
+function renderSubjectChartControls() {
+  const subjectNames = getAllSubjectNames();
+  if (selectedChartSubject !== "ALL" && !subjectNames.includes(selectedChartSubject)) {
+    selectedChartSubject = "ALL";
+  }
+
+  // ドロップダウン更新
+  const selectEl = document.getElementById("subject-chart-select");
+  if (selectEl) {
+    selectEl.innerHTML =
+      `<option value="ALL">全教科まとめて比較</option>` +
+      subjectNames
+        .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)} の推移</option>`)
+        .join("");
+    selectEl.value = selectedChartSubject;
+  }
+
+  // クイック切り替えチップ更新
+  const chipsEl = document.getElementById("subject-chart-chips");
+  if (chipsEl) {
+    chipsEl.innerHTML = "";
+    const options = [{ value: "ALL", label: "全教科比較" }].concat(
+      subjectNames.map((name) => ({ value: name, label: name }))
+    );
+
+    options.forEach((opt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `chip-btn ${selectedChartSubject === opt.value ? "active" : ""}`;
+      btn.textContent = opt.label;
+      btn.addEventListener("click", () => setSelectedChartSubject(opt.value));
+      chipsEl.appendChild(btn);
+    });
+  }
+
+  updateSubjectChartStats();
+}
+
+function updateSubjectChartStats() {
+  const statsEl = document.getElementById("subject-chart-stats");
+  if (!statsEl) return;
+
+  if (!records.length) {
+    statsEl.innerHTML = `<span>テストを記録すると教科ごとの統計が表示されます。</span>`;
+    return;
+  }
+
+  if (selectedChartSubject === "ALL") {
+    const subjectNames = getAllSubjectNames();
+    let bestSubj = null;
+    let bestAvg = -1;
+    subjectNames.forEach((name) => {
+      let sum = 0;
+      let cnt = 0;
+      records.forEach((r) => {
+        const found = r.subjects.find((s) => s.name === name);
+        if (found && found.maxScore > 0) {
+          sum += (found.score / found.maxScore) * 100;
+          cnt++;
+        }
+      });
+      if (cnt > 0 && sum / cnt > bestAvg) {
+        bestAvg = sum / cnt;
+        bestSubj = name;
+      }
+    });
+
+    statsEl.innerHTML = `
+      <div>登録教科数: <strong>${subjectNames.length}教科</strong></div>
+      ${
+        bestSubj
+          ? `<div>平均トップ教科: <strong>${escapeHtml(bestSubj)}</strong> (<strong class="sensitive">${bestAvg.toFixed(1)}点</strong>)</div>`
+          : ""
+      }
+      <div>※ 各教科をタップすると「教科平均点」「学習時間(h)」との詳細比較に切り替わります</div>
+    `;
+    return;
+  }
+
+  let normSum = 0;
+  let count = 0;
+  let bestScore = 0;
+  let totalHours = 0;
+  let diffSum = 0;
+  let diffCount = 0;
+
+  records.forEach((r) => {
+    const found = r.subjects.find((s) => s.name === selectedChartSubject);
+    if (found && found.maxScore > 0) {
+      const norm = (found.score / found.maxScore) * 100;
+      normSum += norm;
+      count++;
+      if (norm > bestScore) bestScore = norm;
+      totalHours += Number(found.studyHours) || 0;
+
+      if (found.classAvg !== null && found.classAvg !== undefined && found.classAvg !== "") {
+        const cNorm = (Number(found.classAvg) / found.maxScore) * 100;
+        diffSum += norm - cNorm;
+        diffCount++;
+      }
+    }
+  });
+
+  const avg = count > 0 ? (normSum / count).toFixed(1) : "--";
+  const avgDiffHtml =
+    diffCount > 0
+      ? (() => {
+          const d = Number((diffSum / diffCount).toFixed(1));
+          const sign = d >= 0 ? "+" : "";
+          return `<div>教科平均との平均差: <strong class="sensitive">${sign}${d}点</strong></div>`;
+        })()
+      : "";
+
+  statsEl.innerHTML = `
+    <div>選択教科: <strong>${escapeHtml(selectedChartSubject)}</strong> (${count}回分)</div>
+    <div>平均点(換算): <strong class="sensitive">${avg}点</strong></div>
+    <div>自己ベスト: <strong class="sensitive">${Math.round(bestScore)}点</strong></div>
+    ${avgDiffHtml}
+    <div>累計学習: <strong>${totalHours.toFixed(1)}h</strong></div>
+  `;
 }
 
 function initInputForm() {
@@ -284,6 +432,7 @@ function handleSaveTest() {
 
 function refreshAll() {
   renderDashboard();
+  renderSubjectChartControls();
   renderSimulator();
   refreshCharts();
 }
@@ -292,6 +441,7 @@ function refreshCharts() {
   const metric = document.getElementById("trend-metric-select").value;
   ChartManager.renderTrendChart(records, metric);
   ChartManager.renderRadarChart(records);
+  ChartManager.renderSubjectTrendChart(records, selectedChartSubject);
   ChartManager.renderMistakesChart(records);
   ChartManager.renderScatterChart(records);
 }
@@ -335,13 +485,14 @@ function renderDashboard() {
   document.getElementById("kpi-total-hours").textContent = `${rpg.totalHours}h`;
   document.getElementById("kpi-test-count").textContent = `記録テスト数: ${records.length}件`;
 
-  // 教科別レベル
+  // 教科別レベル（タップで上の教科別グラフへ連動）
   const lvGrid = document.getElementById("subject-levels-grid");
   lvGrid.innerHTML = "";
   Object.keys(rpg.subjectLevels).forEach((subj) => {
     const info = rpg.subjectLevels[subj];
     const div = document.createElement("div");
-    div.className = "subj-lv-item";
+    div.className = `subj-lv-item ${selectedChartSubject === subj ? "selected" : ""}`;
+    div.dataset.subject = subj;
     div.innerHTML = `
       <div class="subj-lv-top">
         <span>${escapeHtml(subj)}</span>
@@ -349,6 +500,11 @@ function renderDashboard() {
       </div>
       <div class="subj-lv-avg">平均 <span class="sensitive">${info.avg}</span>点 / 最高 <span class="sensitive">${info.best}</span></div>
     `;
+    div.addEventListener("click", () => {
+      setSelectedChartSubject(subj);
+      const card = document.getElementById("subject-trend-card");
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
     lvGrid.appendChild(div);
   });
 
