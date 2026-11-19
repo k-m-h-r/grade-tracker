@@ -10,6 +10,15 @@ let records = [];
 let simWeights = {};
 let simTargets = {};
 
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   records = StorageManager.loadRecords();
   initInputForm();
@@ -105,7 +114,9 @@ function bindEvents() {
     const link = document.createElement("a");
     link.download = `result-card-${Date.now()}.png`;
     link.href = canvas.toDataURL("image/png");
+    document.body.appendChild(link);
     link.click();
+    link.remove();
   });
 }
 
@@ -132,10 +143,10 @@ function appendSubjectRow(subj) {
   ).join("");
 
   tr.innerHTML = `
-    <td><input type="text" class="inp-name" value="${subj.name}" placeholder="教科名" /></td>
-    <td><input type="number" class="inp-score" value="${subj.score}" min="0" max="1000" placeholder="点数" /></td>
-    <td><input type="number" class="inp-max" value="${subj.maxScore || 100}" min="1" max="1000" /></td>
-    <td><input type="number" class="inp-hours" value="${subj.studyHours || 0}" min="0" max="500" step="0.5" /></td>
+    <td><input type="text" class="inp-name" value="${escapeHtml(subj.name)}" placeholder="教科名" /></td>
+    <td><input type="number" class="inp-score" value="${escapeHtml(subj.score)}" min="0" max="1000" placeholder="点数" /></td>
+    <td><input type="number" class="inp-max" value="${escapeHtml(subj.maxScore || 100)}" min="1" max="1000" /></td>
+    <td><input type="number" class="inp-hours" value="${escapeHtml(subj.studyHours || 0)}" min="0" max="500" step="0.5" /></td>
     <td><div class="mistake-chips">${chipsHtml}</div></td>
     <td><button type="button" class="icon-btn btn-del-row" title="行削除">✕</button></td>
   `;
@@ -286,7 +297,7 @@ function renderDashboard() {
     div.className = "subj-lv-item";
     div.innerHTML = `
       <div class="subj-lv-top">
-        <span>${subj}</span>
+        <span>${escapeHtml(subj)}</span>
         <span class="subj-lv-badge">Lv.${info.level}</span>
       </div>
       <div class="subj-lv-avg">平均 <span class="sensitive">${info.avg}</span>点 / 最高 <span class="sensitive">${info.best}</span></div>
@@ -300,20 +311,20 @@ function renderDashboard() {
   [...records].reverse().forEach((rec) => {
     const st = Calculator.calcTestStats(rec);
     const rank = Calculator.getRank(st.avgNormalized);
-    const subjSummary = rec.subjects.map((s) => `${s.name}:${s.score}`).join(" / ");
+    const subjSummary = rec.subjects.map((s) => `${escapeHtml(s.name)}:${s.score}`).join(" / ");
 
     const item = document.createElement("div");
     item.className = "history-item";
     item.innerHTML = `
       <div>
         <div class="history-meta">
-          <span class="tag-badge">${rec.type}</span>
-          <span class="history-title">${rec.name}</span>
-          <span class="history-date">${rec.date}</span>
+          <span class="tag-badge">${escapeHtml(rec.type)}</span>
+          <span class="history-title">${escapeHtml(rec.name)}</span>
+          <span class="history-date">${escapeHtml(rec.date)}</span>
           <strong>[Rank ${rank}]</strong>
         </div>
         <div class="history-scores sensitive">平均 ${st.avgNormalized}点（${subjSummary}）</div>
-        ${rec.memo ? `<div class="hint-text" style="margin-top:4px;">📝 ${rec.memo}</div>` : ""}
+        ${rec.memo ? `<div class="hint-text" style="margin-top:4px;">📝 ${escapeHtml(rec.memo)}</div>` : ""}
       </div>
       <div class="history-actions">
         <button type="button" class="icon-btn btn-card-gen">🏆 カード</button>
@@ -341,7 +352,11 @@ function renderDashboard() {
 function renderSimulator() {
   const tbody = document.getElementById("sim-tbody");
   tbody.innerHTML = "";
-  if (!records.length) return;
+  const neededEl = document.getElementById("sim-needed-total");
+  if (!records.length) {
+    neededEl.textContent = "--";
+    return;
+  }
 
   const latest = records[records.length - 1];
   const targetAvg = Number(document.getElementById("sim-target-avg").value) || 82;
@@ -362,7 +377,7 @@ function renderSimulator() {
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><strong>${s.name}</strong></td>
+      <td><strong>${escapeHtml(s.name)}</strong></td>
       <td class="sensitive">${norm}点</td>
       <td><input type="number" class="sim-w" value="${w}" min="0.5" max="5" step="0.5" style="width:75px;" /></td>
       <td><input type="number" class="sim-t" value="${t}" min="0" max="100" style="width:85px;" /></td>
@@ -383,7 +398,6 @@ function renderSimulator() {
 
   const currentWeightedAvg = weightTotal > 0 ? weightedCurrentSum / weightTotal : 0;
   const neededAvgDiff = Number((targetAvg - currentWeightedAvg).toFixed(1));
-  const neededEl = document.getElementById("sim-needed-total");
   if (neededAvgDiff <= 0) {
     neededEl.textContent = "現在の実力で目標圏内！";
   } else {

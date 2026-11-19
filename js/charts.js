@@ -307,13 +307,14 @@ const ChartManager = {
       ctx.fillText(s.name, x + 12, y + 28);
 
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 28px sans-serif";
+      ctx.font = "bold 26px sans-serif";
       const scStr = isPrivacy ? "**" : `${s.score}`;
-      ctx.fillText(`${scStr}`, x + 12, y + 68);
+      ctx.fillText(scStr, x + 12, y + 68);
+      const scWidth = ctx.measureText(scStr).width;
 
       ctx.fillStyle = "#64748b";
-      ctx.font = "14px sans-serif";
-      ctx.fillText(`/${s.maxScore}`, x + 62, y + 68);
+      ctx.font = "13px sans-serif";
+      ctx.fillText(`/${s.maxScore}`, x + 16 + scWidth, y + 68);
     });
   }
 };

@@ -51,7 +51,7 @@ const StorageManager = {
 
   saveRecords(records) {
     // 日付昇順でソートして保存
-    const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
+    const sorted = [...records].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
     return sorted;
   },
@@ -79,8 +79,10 @@ const StorageManager = {
     const today = new Date().toISOString().slice(0, 10);
     a.href = url;
     a.download = `gradequest-backup-${today}.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
 
   importJSON(file) {
