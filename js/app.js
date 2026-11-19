@@ -10,6 +10,9 @@ let records = [];
 let simWeights = {};
 let simTargets = {};
 let selectedChartSubject = "ALL";
+let editingRecordId = null;
+let lastDeletedRecord = null;
+let toastTimer = null;
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -27,16 +30,38 @@ document.addEventListener("DOMContentLoaded", () => {
   refreshAll();
 });
 
+function switchTab(tabName) {
+  document.querySelectorAll(".tab-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tabName);
+  });
+  document.querySelectorAll(".tab-panel").forEach((p) => {
+    p.classList.toggle("active", p.id === `tab-${tabName}`);
+  });
+  refreshCharts();
+}
+
+function showToast(message, canUndo = false) {
+  const bar = document.getElementById("toast-bar");
+  const msgEl = document.getElementById("toast-message");
+  const undoBtn = document.getElementById("btn-toast-undo");
+  if (!bar || !msgEl || !undoBtn) return;
+
+  msgEl.textContent = message;
+  undoBtn.classList.toggle("hidden", !canUndo);
+  bar.classList.remove("hidden");
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    bar.classList.add("hidden");
+    if (canUndo) lastDeletedRecord = null;
+  }, canUndo ? 8000 : 3500);
+}
+
 function bindEvents() {
   // タブ切り替え
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      const targetId = `tab-${btn.dataset.tab}`;
-      document.getElementById(targetId).classList.add("active");
-      refreshCharts();
+      switchTab(btn.dataset.tab);
     });
   });
 
@@ -65,8 +90,9 @@ function bindEvents() {
     if (!file) return;
     try {
       records = await StorageManager.importJSON(file);
+      cancelEditMode(true);
       refreshAll();
-      alert("JSONデータを復元しました！");
+      showToast("JSONデータを復元しました！");
     } catch (err) {
       alert("読み込みエラー: " + err.message);
     }
@@ -77,8 +103,46 @@ function bindEvents() {
   document.getElementById("btn-clear-sample").addEventListener("click", () => {
     if (confirm("データを初期サンプル状態に戻しますか？")) {
       records = StorageManager.resetToSample();
+      cancelEditMode(true);
       refreshAll();
+      showToast("サンプルデータに初期化しました");
     }
+  });
+
+  // 全データ消去
+  document.getElementById("btn-clear-all").addEventListener("click", () => {
+    if (!records.length) {
+      alert("消去するテストデータがありません。");
+      return;
+    }
+    if (confirm("記録されているすべてのテストデータを消去しますか？
+（※必要な場合は先に「💾 保存」でバックアップしてください）")) {
+      records = StorageManager.clearAllRecords();
+      lastDeletedRecord = null;
+      cancelEditMode(true);
+      refreshAll();
+      showToast("すべてのテストデータを消去しました");
+    }
+  });
+
+  // 削除取り消し（Undo）
+  document.getElementById("btn-toast-undo").addEventListener("click", () => {
+    if (!lastDeletedRecord) return;
+    records = StorageManager.addRecord(lastDeletedRecord);
+    const restoredName = lastDeletedRecord.name;
+    lastDeletedRecord = null;
+    refreshAll();
+    showToast(`「${restoredName}」を復元しました`);
+  });
+
+  // 編集キャンセルボタン（上部・下部）
+  document.getElementById("btn-cancel-edit").addEventListener("click", () => {
+    cancelEditMode(true);
+    showToast("編集をキャンセルしました");
+  });
+  document.getElementById("btn-cancel-edit-bottom").addEventListener("click", () => {
+    cancelEditMode(true);
+    showToast("編集をキャンセルしました");
   });
 
   // 推移グラフ指標切替
@@ -274,10 +338,79 @@ function updateSubjectChartStats() {
 }
 
 function initInputForm() {
+  document.getElementById("test-name").value = "";
   document.getElementById("test-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("test-type").value = "定期考査";
+  document.getElementById("test-goal").value = 80;
+  document.getElementById("test-avg").value = "";
+  document.getElementById("test-memo").value = "";
   renderSubjectInputRows(
     PRESETS.science.map((name) => ({ name, score: "", classAvg: "", maxScore: 100, studyHours: 0, mistakes: [] }))
   );
+}
+
+function startEditRecord(rec) {
+  editingRecordId = rec.id;
+  document.getElementById("input-form-title").textContent = "✏️ テスト成績の編集";
+  document.getElementById("editing-test-title").textContent = rec.name;
+  document.getElementById("edit-mode-banner").classList.remove("hidden");
+  document.getElementById("btn-cancel-edit-bottom").classList.remove("hidden");
+  document.getElementById("btn-save-test").textContent = "💾 変更を保存する";
+
+  document.getElementById("test-name").value = rec.name || "";
+  document.getElementById("test-date").value = rec.date || new Date().toISOString().slice(0, 10);
+  document.getElementById("test-type").value = rec.type || "定期考査";
+  document.getElementById("test-goal").value = rec.goalAvg ?? 80;
+  document.getElementById("test-avg").value = rec.testAvg ?? "";
+  document.getElementById("test-memo").value = rec.memo || "";
+
+  const clonedSubjects = (rec.subjects || []).map((s) => ({
+    name: s.name || "",
+    score: s.score ?? "",
+    classAvg: s.classAvg ?? "",
+    maxScore: s.maxScore || 100,
+    studyHours: s.studyHours || 0,
+    mistakes: Array.isArray(s.mistakes) ? [...s.mistakes] : []
+  }));
+  renderSubjectInputRows(clonedSubjects);
+
+  switchTab("input");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function duplicateRecordToForm(rec) {
+  cancelEditMode(false);
+  document.getElementById("test-name").value = `${rec.name} (コピー)`;
+  document.getElementById("test-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("test-type").value = rec.type || "定期考査";
+  document.getElementById("test-goal").value = rec.goalAvg ?? 80;
+  document.getElementById("test-avg").value = "";
+  document.getElementById("test-memo").value = "";
+
+  const templateSubjects = (rec.subjects || []).map((s) => ({
+    name: s.name || "",
+    score: "",
+    classAvg: "",
+    maxScore: s.maxScore || 100,
+    studyHours: 0,
+    mistakes: []
+  }));
+  renderSubjectInputRows(templateSubjects);
+
+  switchTab("input");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  showToast(`「${rec.name}」の教科構成をコピーしました`);
+}
+
+function cancelEditMode(resetForm = true) {
+  editingRecordId = null;
+  document.getElementById("input-form-title").textContent = "⚡ テスト成績の記録";
+  document.getElementById("edit-mode-banner").classList.add("hidden");
+  document.getElementById("btn-cancel-edit-bottom").classList.add("hidden");
+  document.getElementById("btn-save-test").textContent = "✅ この成績を保存する";
+  if (resetForm) {
+    initInputForm();
+  }
 }
 
 function renderSubjectInputRows(subjects) {
@@ -409,8 +542,9 @@ function handleSaveTest() {
     return;
   }
 
-  const newRecord = {
-    id: "rec-" + Date.now(),
+  const isEditing = Boolean(editingRecordId);
+  const recordData = {
+    id: editingRecordId || "rec-" + Date.now(),
     name,
     date,
     type,
@@ -420,14 +554,27 @@ function handleSaveTest() {
     subjects
   };
 
-  records = StorageManager.addRecord(newRecord);
-  document.getElementById("test-name").value = "";
-  document.getElementById("test-avg").value = "";
-  document.getElementById("test-memo").value = "";
-  refreshAll();
+  if (isEditing) {
+    records = StorageManager.updateRecord(recordData);
+  } else {
+    records = StorageManager.addRecord(recordData);
+  }
 
-  // ダッシュボードへ自動遷移
-  document.querySelector('[data-tab="dashboard"]').click();
+  cancelEditMode(true);
+  refreshAll();
+  switchTab("dashboard");
+  showToast(isEditing ? `「${name}」を更新しました` : `「${name}」を記録しました`);
+}
+
+function handleDeleteRecord(rec) {
+  if (!confirm(`「${rec.name}」を削除しますか？`)) return;
+  lastDeletedRecord = rec;
+  if (editingRecordId === rec.id) {
+    cancelEditMode(true);
+  }
+  records = StorageManager.deleteRecord(rec.id);
+  refreshAll();
+  showToast(`「${rec.name}」を削除しました`, true);
 }
 
 function refreshAll() {
@@ -488,29 +635,40 @@ function renderDashboard() {
   // 教科別レベル（タップで上の教科別グラフへ連動）
   const lvGrid = document.getElementById("subject-levels-grid");
   lvGrid.innerHTML = "";
-  Object.keys(rpg.subjectLevels).forEach((subj) => {
-    const info = rpg.subjectLevels[subj];
-    const div = document.createElement("div");
-    div.className = `subj-lv-item ${selectedChartSubject === subj ? "selected" : ""}`;
-    div.dataset.subject = subj;
-    div.innerHTML = `
-      <div class="subj-lv-top">
-        <span>${escapeHtml(subj)}</span>
-        <span class="subj-lv-badge">Lv.${info.level}</span>
-      </div>
-      <div class="subj-lv-avg">平均 <span class="sensitive">${info.avg}</span>点 / 最高 <span class="sensitive">${info.best}</span></div>
-    `;
-    div.addEventListener("click", () => {
-      setSelectedChartSubject(subj);
-      const card = document.getElementById("subject-trend-card");
-      if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  const subjKeys = Object.keys(rpg.subjectLevels);
+  if (!subjKeys.length) {
+    lvGrid.innerHTML = `<div class="hint-text">テストを記録すると教科別レベルが表示されます。</div>`;
+  } else {
+    subjKeys.forEach((subj) => {
+      const info = rpg.subjectLevels[subj];
+      const div = document.createElement("div");
+      div.className = `subj-lv-item ${selectedChartSubject === subj ? "selected" : ""}`;
+      div.dataset.subject = subj;
+      div.innerHTML = `
+        <div class="subj-lv-top">
+          <span>${escapeHtml(subj)}</span>
+          <span class="subj-lv-badge">Lv.${info.level}</span>
+        </div>
+        <div class="subj-lv-avg">平均 <span class="sensitive">${info.avg}</span>点 / 最高 <span class="sensitive">${info.best}</span></div>
+      `;
+      div.addEventListener("click", () => {
+        setSelectedChartSubject(subj);
+        const card = document.getElementById("subject-trend-card");
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+      lvGrid.appendChild(div);
     });
-    lvGrid.appendChild(div);
-  });
+  }
 
   // テスト履歴一覧（新しい順に表示）
   const listEl = document.getElementById("history-list");
   listEl.innerHTML = "";
+
+  if (!records.length) {
+    listEl.innerHTML = `<div class="empty-state-box">記録されたテストがありません。「⚡ 成績入力」タブから新しいテストを記録してください。</div>`;
+    return;
+  }
+
   [...records].reverse().forEach((rec) => {
     const st = Calculator.calcTestStats(rec);
     const rank = Calculator.getRank(st.avgNormalized);
@@ -543,10 +701,20 @@ function renderDashboard() {
         ${rec.memo ? `<div class="hint-text" style="margin-top:4px;">📝 ${escapeHtml(rec.memo)}</div>` : ""}
       </div>
       <div class="history-actions">
-        <button type="button" class="icon-btn btn-card-gen">🏆 カード</button>
-        <button type="button" class="icon-btn btn-del-rec" style="color:var(--danger);">削除</button>
+        <button type="button" class="icon-btn btn-edit-rec" title="このテストを編集">✏️ 編集</button>
+        <button type="button" class="icon-btn btn-dup-rec" title="教科構成をコピーして新規入力">📋 複製</button>
+        <button type="button" class="icon-btn btn-card-gen" title="リザルトカード画像を生成">🏆 カード</button>
+        <button type="button" class="icon-btn danger-btn btn-del-rec" title="このテストを削除">🗑️ 削除</button>
       </div>
     `;
+
+    item.querySelector(".btn-edit-rec").addEventListener("click", () => {
+      startEditRecord(rec);
+    });
+
+    item.querySelector(".btn-dup-rec").addEventListener("click", () => {
+      duplicateRecordToForm(rec);
+    });
 
     item.querySelector(".btn-card-gen").addEventListener("click", () => {
       const isPrivacy = document.body.classList.contains("privacy-mode");
@@ -555,10 +723,7 @@ function renderDashboard() {
     });
 
     item.querySelector(".btn-del-rec").addEventListener("click", () => {
-      if (confirm(`「${rec.name}」を削除しますか？`)) {
-        records = StorageManager.deleteRecord(rec.id);
-        refreshAll();
-      }
+      handleDeleteRecord(rec);
     });
 
     listEl.appendChild(item);

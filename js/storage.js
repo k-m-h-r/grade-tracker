@@ -39,7 +39,7 @@ const StorageManager = {
   loadRecords() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
+      if (raw === null) {
         this.saveRecords(DEFAULT_SAMPLE_DATA);
         return [...DEFAULT_SAMPLE_DATA];
       }
@@ -64,9 +64,24 @@ const StorageManager = {
     return this.saveRecords(records);
   },
 
+  updateRecord(updatedRecord) {
+    const records = this.loadRecords();
+    const idx = records.findIndex((r) => r.id === updatedRecord.id);
+    if (idx >= 0) {
+      records[idx] = updatedRecord;
+    } else {
+      records.push(updatedRecord);
+    }
+    return this.saveRecords(records);
+  },
+
   deleteRecord(id) {
     const records = this.loadRecords().filter((r) => r.id !== id);
     return this.saveRecords(records);
+  },
+
+  clearAllRecords() {
+    return this.saveRecords([]);
   },
 
   resetToSample() {
