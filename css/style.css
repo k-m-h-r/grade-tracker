@@ -362,6 +362,12 @@ textarea {
   width: 100%;
 }
 
+select.mini-select {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
