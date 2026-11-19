@@ -8,6 +8,7 @@
   --primary: #3b82f6;
   --primary-hover: #2563eb;
   --accent: #10b981;
+  --info: #06b6d4;
   --danger: #ef4444;
   --warning: #f59e0b;
   --shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
@@ -24,6 +25,7 @@
   --primary: #60a5fa;
   --primary-hover: #3b82f6;
   --accent: #34d399;
+  --info: #22d3ee;
   --danger: #f87171;
   --warning: #fbbf24;
   --shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
@@ -306,6 +308,16 @@ body.privacy-mode .sensitive {
   border-radius: 6px;
 }
 
+.avg-pill {
+  background: rgba(34, 211, 238, 0.16);
+  color: var(--info);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 .history-title {
   font-weight: 700;
   font-size: 1rem;
@@ -334,6 +346,10 @@ body.privacy-mode .sensitive {
   grid-template-columns: 2fr 1.2fr 1fr 1fr;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.form-row.form-row-5 {
+  grid-template-columns: 1.8fr 1.1fr 0.95fr 0.9fr 1.1fr;
 }
 
 .form-group {
@@ -408,7 +424,7 @@ textarea:focus {
 .sim-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  min-width: 680px;
 }
 
 .input-table th,
@@ -457,6 +473,8 @@ textarea:focus {
   padding: 12px 16px;
   display: flex;
   justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 10px;
   font-size: 0.95rem;
 }
 
@@ -574,13 +592,15 @@ textarea:focus {
   .charts-grid {
     grid-template-columns: 1fr;
   }
-  .form-row {
+  .form-row,
+  .form-row.form-row-5 {
     grid-template-columns: 1fr 1fr;
   }
 }
 
 @media (max-width: 540px) {
-  .form-row {
+  .form-row,
+  .form-row.form-row-5 {
     grid-template-columns: 1fr;
   }
 }
