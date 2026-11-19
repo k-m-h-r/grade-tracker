@@ -49,6 +49,7 @@
           <div class="kpi-label">最新テスト平均</div>
           <div class="kpi-value sensitive" id="kpi-latest-avg">--</div>
           <div class="kpi-sub" id="kpi-diff-prev">前回比 --</div>
+          <div class="kpi-sub sensitive" id="kpi-diff-testavg">テスト平均比 --</div>
         </div>
         <div class="card kpi-card">
           <div class="kpi-label">総合ランク判定</div>
@@ -71,7 +72,7 @@
       <div class="charts-grid">
         <div class="card chart-card">
           <div class="card-header">
-            <h2>📈 成績推移 ＆ 目標ライン</h2>
+            <h2>📈 成績推移 ＆ テスト平均・目標</h2>
             <select id="trend-metric-select" class="mini-select">
               <option value="avg">平均点推移</option>
               <option value="total">合計点推移</option>
@@ -84,7 +85,7 @@
 
         <div class="card chart-card">
           <div class="card-header">
-            <h2>🕸️ 教科バランス（最新 vs 前回）</h2>
+            <h2>🕸️ 教科バランス（自分 vs 平均・前回）</h2>
           </div>
           <div class="chart-box">
             <canvas id="chart-radar"></canvas>
@@ -119,7 +120,7 @@
         </div>
 
         <!-- テスト基本メタ情報 -->
-        <div class="form-row">
+        <div class="form-row form-row-5">
           <div class="form-group">
             <label for="test-name">テスト名</label>
             <input type="text" id="test-name" placeholder="例：2学期 期末考査" />
@@ -141,6 +142,10 @@
             <label for="test-goal">目標平均点</label>
             <input type="number" id="test-goal" value="80" min="0" max="1000" step="0.1" />
           </div>
+          <div class="form-group">
+            <label for="test-avg">テスト平均点（任意）</label>
+            <input type="number" id="test-avg" placeholder="教科平均から自動計算" min="0" max="1000" step="0.1" />
+          </div>
         </div>
 
         <!-- 科目プリセット -->
@@ -158,7 +163,8 @@
             <thead>
               <tr>
                 <th>教科</th>
-                <th>得点</th>
+                <th>自分の得点</th>
+                <th>平均点(任意)</th>
                 <th>満点</th>
                 <th>学習(h)</th>
                 <th>失点カルテ（タップで複数選択）</th>
@@ -172,7 +178,8 @@
         <!-- リアルタイムプレビューバー -->
         <div class="live-summary-bar">
           <div>合計: <strong id="live-total" class="sensitive">0</strong> 点</div>
-          <div>平均: <strong id="live-avg" class="sensitive">0.0</strong> 点</div>
+          <div>自分平均: <strong id="live-avg" class="sensitive">0.0</strong> 点</div>
+          <div>テスト平均: <strong id="live-test-avg">--</strong> <span id="live-avg-diff" class="sensitive"></span></div>
           <div>予想ランク: <strong id="live-rank" class="rank-text">-</strong></div>
         </div>
 
@@ -214,7 +221,7 @@
             <thead>
               <tr>
                 <th>教科</th>
-                <th>現在得点</th>
+                <th>現在得点（参考平均）</th>
                 <th>配点倍率</th>
                 <th>次回目標点（調整可）</th>
                 <th>必要アップ</th>
