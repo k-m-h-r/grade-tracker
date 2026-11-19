@@ -525,13 +525,14 @@ const ChartManager = {
     ctx.fillText(summaryLine, 42, 155);
 
     // 各教科スコアボックス
-    const cols = Math.min(test.subjects.length, 5);
-    const boxW = Math.floor((716 - (cols - 1) * 12) / cols);
-    test.subjects.slice(0, 10).forEach((s, idx) => {
-      const col = idx % 5;
-      const row = Math.floor(idx / 5);
-      const x = 42 + col * (boxW + 12);
+    const cols = Math.min(test.subjects.length, 6);
+    const boxW = Math.floor((716 - (cols - 1) * 10) / cols);
+    test.subjects.slice(0, 12).forEach((s, idx) => {
+      const col = idx % 6;
+      const row = Math.floor(idx / 6);
+      const x = 42 + col * (boxW + 10);
       const y = 195 + row * 105;
+
 
       ctx.fillStyle = "rgba(30, 41, 59, 0.9)";
       ctx.fillRect(x, y, boxW, 90);
