@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>GradeQuest - 成績記録＆戦略ダッシュボード</title>
   <link rel="stylesheet" href="css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <!-- ヘッダー＆RPGステータスバー -->
@@ -27,7 +27,7 @@
         <button id="btn-export" class="icon-btn" title="JSONバックアップ保存">💾 保存</button>
         <label class="icon-btn file-label" title="JSONバックアップ復元">
           📂 読込
-          <input type="file" id="input-import" accept=".json" hidden />
+          <input type="file" id="input-import" accept=".json,application/json,text/plain" hidden />
         </label>
       </div>
     </div>
